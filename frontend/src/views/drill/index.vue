@@ -39,6 +39,7 @@
           <th v-for="column in columns" :key="column">{{ column }}</th>
           <th>当前状态</th>
           <th>可执行动作</th>
+          <th>下钻结果</th>
         </tr>
       </thead>
       <tbody>
@@ -56,9 +57,20 @@
               {{ action }}
             </button>
           </td>
+          <td>
+            <button
+              v-if="pathNoOf(row)"
+              class="link"
+              type="button"
+              @click="focusDrillResult(row)"
+            >
+              {{ pathNoOf(row) === selectedPath ? '正在查看' : '查看字段明细' }}
+            </button>
+            <span v-else>—</span>
+          </td>
         </tr>
         <tr v-if="!rows.length">
-          <td :colspan="columns.length + 2" class="empty-state">暂无多维下钻数据，可先登记下钻路径</td>
+          <td :colspan="columns.length + 3" class="empty-state">暂无多维下钻数据，可先登记下钻路径</td>
         </tr>
       </tbody>
     </table>
@@ -67,6 +79,8 @@
       <span>共 {{ total }} 条多维下钻记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
+
+    <DrillResultPanel v-model="selectedPath" />
   </section>
 </template>
 
@@ -75,11 +89,13 @@ import { computed, onMounted, ref } from 'vue'
 
 import {
   downloadEntries,
+  listDrillPaths,
   listEntries,
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
+import DrillResultPanel from './DrillResultPanel.vue'
 
 const meta = moduleMeta('drill')
 const columns = ["路径编号", "起点维度", "下钻层数", "层级维度列表", "聚合指标", "默认展开层", "排序方向", "最多展示行数"]
@@ -92,6 +108,7 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const selectedPath = ref(listDrillPaths()[0]?.pathNo ?? 'DRIL-0001')
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -102,6 +119,20 @@ const statusSummary = computed(() =>
 function resetFilters() {
   filters.value = {}
   reload()
+}
+
+const drillPathNos = new Set(listDrillPaths().map((item) => item.pathNo))
+
+function pathNoOf(row: EntryRow): string {
+  const pathNo = String(row['路径编号'] ?? '')
+  return drillPathNos.has(pathNo) ? pathNo : ''
+}
+
+function focusDrillResult(row: EntryRow) {
+  const pathNo = pathNoOf(row)
+  if (pathNo) {
+    selectedPath.value = pathNo
+  }
 }
 
 function exportRows() {
